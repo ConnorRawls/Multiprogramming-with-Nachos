@@ -85,19 +85,29 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", 
 					numPages, size);
-// first, set up the translation 
+
+// **************************************** Begin changes made by Connor Rawls ****************************************
+    int addrEmpty = 0;
+    // Retains addresses for deallocation
+    int* addrArray = new int[numPages];
+
+    // first, set up the translation 
     pageTable = new TranslationEntry[numPages];
     for (i = 0; i < numPages; i++) {
-	pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
-	pageTable[i].physicalPage = i;
-	pageTable[i].valid = TRUE;
-	pageTable[i].use = FALSE;
-	pageTable[i].dirty = FALSE;
-	pageTable[i].readOnly = FALSE;  // if the code segment was entirely on 
-					// a separate page, we could set its 
-					// pages to be read-only
+        // Return empty address
+        addrEmpty = findEmpty();
+        addrArray[i] = addrEmpty;
+        pageTable[i].virtualPage = i;
+        pageTable[i].physicalPage = addrEmpty;
+        pageTable[i].valid = TRUE;
+        pageTable[i].use = FALSE;
+        pageTable[i].dirty = FALSE;
+        pageTable[i].readOnly = FALSE;  // if the code segment was entirely on 
+                        // a separate page, we could set its 
+                        // pages to be read-only
     }
     
+// TODO Stop this
 // zero out the entire address space, to zero the unitialized data segment 
 // and the stack segment
     bzero(machine->mainMemory, size);
@@ -107,16 +117,30 @@ AddrSpace::AddrSpace(OpenFile *executable)
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
 			noffH.code.virtualAddr, noffH.code.size);
         executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]),
-			noffH.code.size, noffH.code.inFileAddr);
+			noffH.code.size, pageTable.physicalPage);
     }
     if (noffH.initData.size > 0) {
         DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
 			noffH.initData.virtualAddr, noffH.initData.size);
         executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
-			noffH.initData.size, noffH.initData.inFileAddr);
+			noffH.initData.size, pageTable.physicalPage);
     }
 
 }
+
+//----------------------------------------------------------------------
+// AddrSpace::findEmpty
+// Returns empty address found in bitmap
+// Otherwise throw memory full error
+//----------------------------------------------------------------------
+
+int AddrSpace::findEmpty() {
+    for(int i = 0; i < AddrSpace::addrMap.size(); i++){
+        if(!addrMap.Test(i)) return i;
+    }
+    // Else throw full memory error
+}
+// **************************************** End changes made by Connor Rawls ****************************************
 
 //----------------------------------------------------------------------
 // AddrSpace::~AddrSpace
@@ -126,6 +150,9 @@ AddrSpace::AddrSpace(OpenFile *executable)
 AddrSpace::~AddrSpace()
 {
    delete pageTable;
+   for(int i = 0; i < numPages; i++){
+       addrMap.Clear(addrArray[i]);
+   }
 }
 
 //----------------------------------------------------------------------

@@ -15,10 +15,19 @@
 
 #include "copyright.h"
 #include "filesys.h"
+// ***Begin changes made by Connor Rawls***
+#include "bitmap.h"
 
 #define UserStackSize		1024 	// increase this as necessary!
 
 class AddrSpace {
+  private:
+    // Tracks empty/full addresses
+    // TODO Initialize map to available size in memory
+    static BitMap addrMap;
+    int findEmpty();
+    // ***End changes made by Connor Rawls***
+    
   public:
     AddrSpace(OpenFile *executable);	// Create an address space,
 					// initializing it with the program
